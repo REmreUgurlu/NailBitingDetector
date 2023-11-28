@@ -1,10 +1,9 @@
 import DataAccess.DataAccess as data_access
 import Classifier as classifier
-
 import cv2
 import mediapipe as mp
 import numpy as np
-import threading
+import time
 
 
 class FaceMeshDetector():
@@ -33,8 +32,7 @@ class FaceMeshDetector():
             mouth_pos_x = round(mouth_pos_x, 6)
             mouth_pos_y = round(mouth_pos_y, 6)
             positions = [mouth_pos_x, mouth_pos_y]
-            face.append(positions)
-            return True, face
+            return True, positions
         else:
             return False, face
 
@@ -51,19 +49,31 @@ class HandDetector():
         self.hands = self.mpHands.Hands(self.mode, self.maxHands, self.modComplex, self.detectionCon, self.trackCon)
         self.mpDraw = mp.solutions.drawing_utils
 
+
     def findHands(self, img, draw=True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(imgRGB)
-
+        is_successfull = True
+        is_biting = False
         if self.results.multi_hand_landmarks:
             for handLms in self.results.multi_hand_landmarks:
                 if draw:
                     self.mpDraw.draw_landmarks(img, handLms, self.mpHands.HAND_CONNECTIONS)
-            return True, self.findPosition(img)
+            cv2.imshow('frame1', img)
+            if cv2.waitKey(4000) == ord('q'):
+                is_successfull = False
+            elif cv2.waitKey(4000) == ord('w'):
+                is_biting = True
+            else:
+                pass
+            cv2.destroyWindow('frame1')
+            time.sleep(1)
+            lm_list = self.findPosition()
+            return is_successfull, lm_list, img, is_biting
         else:
-            return False, None
+            return not is_successfull, None, imgRGB, is_biting
 
-    def findPosition(self, img, handNo=0, draw=True):
+    def findPosition(self, handNo=0, draw=True):
         lmList = []
 
         if self.results.multi_hand_landmarks:
@@ -71,122 +81,49 @@ class HandDetector():
             for id, lm in enumerate(myHand.landmark):
                 if id % 4 == 0 and id != 0:
                     rounded_x, rounded_y = round(lm.x,6), round(lm.y, 6) 
-                    lmList.append([rounded_x, rounded_y])
-                    # if draw:
-                    #     cv2.circle(img, (cx,cy), 10, (255,0,0), cv2.FILLED)
+                    lmList.append(rounded_x)
+                    lmList.append(rounded_y)
+
 
         return lmList
-    
-def writer(time_interval, is_biting):
-    face_lms = []
-    hand_lms = []
-    cap_face = cv2.VideoCapture(0)
-    face_detector = FaceMeshDetector()
-    hand_detector = HandDetector()
-
-
-    success_capture, img_face = cap_face.read()
-    success_face, face_lms = face_detector.findFaceMesh(img_face)
-
-    t = threading.Timer(time_interval, writer, args=(time_interval, is_biting))
-    t.start()
-    landmarks = []
-
-    if success_face == False:
-        print("No Face Detected")
-        t.cancel()
-        return
-    else:
-        success_cap, img_hand = cap_face.read()
-        success_hand, hand_lms = hand_detector.findHands(img_hand, True)
-        if success_hand == True:
-            for k in range(0,2):
-                landmarks.append(face_lms[0][k])
-            for i in range(0,5):
-                for j in range(0, 2):
-                    landmarks.append(hand_lms[i][j])
-            landmarks.append(is_biting)
-        else:
-            print("No Hands detected")
-            t.cancel()
-            return
-
-    landmarks = np.array(landmarks)
-    landmarks_reshaped = landmarks.reshape((1,13))
-    writer_sample = data_access.Writer(landmarks_reshaped)
-    df = writer_sample.write_to_csv()
-    
-    return(print(df))
-    
-
-def reader():
-    reader = data_access.Reader()
-    train_dataset, validation_dataset, test_dataset = reader.read_with_parameters()
-
-    train_features = train_dataset.copy()
-    validation_features = validation_dataset.copy()
-    test_features = test_dataset.copy()
-
-    train_labels = train_features.pop('is_biting')
-    validation_labels = validation_features.pop('is_biting')
-    test_labels = test_features.pop('is_biting')
-
-    classification_model = classifier.Classify(train_features, train_labels, validation_features, validation_labels, test_features, test_labels)
-
-    result = classification_model.classification(epochs=100)
-    
-def predicter():
-    face_lms = []
-    hand_lms = []
-    cap_face = cv2.VideoCapture(0)
-    res, img = cap_face.read()
-    face_detector = FaceMeshDetector()  
-    hand_detector = HandDetector()
-
-    success_capture, img_face = cap_face.read()
-    success_face, face_lms = face_detector.findFaceMesh(img_face)
-
-    landmarks = []
-
-    if success_face == False:
-        print("No Face Detected")
-        return
-    else:
-        success_cap, img_hand = cap_face.read()
-        success_hand, hand_lms = hand_detector.findHands(img_hand, True)
-        if success_hand == True:
-            for k in range(0,2):
-                landmarks.append(face_lms[0][k])
-            for i in range(0,5):
-                for j in range(0, 2):
-                    landmarks.append(hand_lms[i][j])
-        else:
-            print("No Hands detected")
-            return False, img_face
-
-    reader = data_access.Reader()
-    train_dataset, validation_dataset, test_dataset = reader.read_with_parameters()
-
-    train_features = train_dataset.copy()
-    validation_features = validation_dataset.copy()
-    test_features = test_dataset.copy()
-
-    train_labels = train_features.pop('is_biting')
-    validation_labels = validation_features.pop('is_biting')
-    test_labels = test_features.pop('is_biting')
-
-    prediction_model = classifier.Classify(train_features, train_labels, validation_features, validation_labels, test_features, test_labels)
-
-    result = prediction_model.prediction(landmarks)
-    return result, img_face
 
 
 def main():
-    # Use below code to add new rows to the dataset.csv
-    # writer(time_interval=5, is_biting=False)
+    face_mesh = FaceMeshDetector()
+    hand_mesh = HandDetector()
+    face_lms = []
+    hand_lms = []
+    lms = []
+    cap_face = cv2.VideoCapture(0)
 
-    # Below lines of code will try to predict if you are biting your nail
-    result, img = predicter()
-    print(np.argmax(result))
-    cv2.imshow("img", img)
-    cv2.waitKey(10000)
+    success_capture, img_face = cap_face.read()
+    success_face, face_lms = face_mesh.findFaceMesh(img_face) 
+    if success_face == False:
+        print("No Face Detected")
+        return
+    else:
+        lms = face_lms.copy()
+        success_hand, hand_lms, img, is_biting = hand_mesh.findHands(img_face, True)
+        if success_hand == True:
+            face_lms.extend(hand_lms)
+            # is_biting 
+            # cv2.imshow("frame2", img)
+            # if cv2.waitKey(2000) == ord('e'):
+            #     is_biting = False
+            # cv2.destroyWindow('frame2')
+            # elif cv2.waitKey(2500) == ord('q'):
+            #     return
+            for i in range(0,10,2):
+                pos_x = round(lms[0] - hand_lms[i],6)            
+                pos_y = round(lms[1] - hand_lms[i+1],6)
+                positions = [pos_x, pos_y]
+                lms.extend(positions)
+            lms.append(is_biting)
+            final_lms = lms[2:]
+            return print(final_lms)
+        else:
+            print("No Hands detected")
+            return
+
+if __name__ == "__main__":
+    main()

@@ -7,12 +7,14 @@ class Writer:
         self.csv_path = "data.csv"
 
     def write_to_csv(self, mode='a'):
-        column_names = ["mouth_pos_x", "mouth_pos_y", "thumb_x", "thumb_y", "index_x", "index_y", "middle_x", 
+        column_names = ["thumb_x", "thumb_y", "index_x", "index_y", "middle_x", 
                         "middle_y", "ring_x", "ring_y", "little_x", "little_y", "is_biting"]
         df = pd.DataFrame(data=self.data, columns=column_names)
         df.to_csv(self.csv_path, mode=mode, index=False, header=not Rules.check_if_csv_exist(self.csv_path))
         return df
 
+        
+        
 
 class Reader:
     def __init__(self):
@@ -34,10 +36,10 @@ class Reader:
 
         return train_dataset, validation_dataset, test_dataset
 
-    def drop(self):
+    def drop(self, label, axis=0):
         df = self.read_from_csv()
-        df.drop(labels=51, axis=0)
-        return df
+        dropped_df = df.drop(labels=label, axis=axis)
+        return dropped_df
 
 class Rules:
     def check_if_csv_exist(path):
@@ -49,5 +51,6 @@ class Rules:
     
 if __name__ == "__main__":
     reader = Reader()
-    df = reader.drop()
+    value = input("which row you want to drop?")
+    df = reader.drop(value)
     print(df)
