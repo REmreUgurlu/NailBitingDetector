@@ -1,4 +1,4 @@
-import DataAccess.DataAccess as data_access
+import DataAccess as data_access
 import Classifier as classifier
 import cv2
 import mediapipe as mp
@@ -29,12 +29,46 @@ class FaceMeshDetector():
             self.my_face = self.results.multi_face_landmarks[0]
             mouth_pos_x = self.my_face.landmark[13].x
             mouth_pos_y = self.my_face.landmark[13].y
-            mouth_pos_x = round(mouth_pos_x, 6)
-            mouth_pos_y = round(mouth_pos_y, 6)
+            mouth_pos_x = round(mouth_pos_x, 3)
+            mouth_pos_y = round(mouth_pos_y, 3)
+            # print(mouth_pos_x,  mouth_pos_y)
+            ih,iw,_ = img.shape
             positions = [mouth_pos_x, mouth_pos_y]
+            drawing_positions = [int(mouth_pos_x * iw), int(mouth_pos_y * ih)]
+            # print(drawing_positions)
+            cv2.circle(img, drawing_positions, 5, (255,0,0), -1)
+
             return True, positions
         else:
             return False, face
+
+class FaceDetector():
+    def __init__(self, model_selection=1, min_detec_conf=0.5):
+        self.model_selection = model_selection
+        self.min_detec_conf = min_detec_conf
+
+        self.mp_face_detection = mp.solutions.face_detection
+        self.mp_drawing = mp.solutions.drawing_utils
+
+        self.face_detection = self.mp_face_detection.FaceDetection(self.model_selection, self.min_detec_conf)
+
+    def find_mouth(self, img):
+        imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        results = self.face_detection.process(imgRGB)
+        if results.detections:
+            for detection in results.detections:
+                landmarks = detection.location_data.relative_keypoints
+
+                ih,iw,_ = img.shape
+                mouth = (int(landmarks[3].x * iw), int(landmarks[3].y * ih))
+
+                cv2.circle(img,mouth, 5, (0,255,0), -1)
+            return True
+
+        # mouth_pos = self.mp_face_detection.get_key_point()
+        
+
+        
 
 class HandDetector():
     def __init__(self, mode=False, maxHands=1, modComplex=1, detectionCon=0.2, trackCon=0.5):
@@ -53,25 +87,28 @@ class HandDetector():
     def findHands(self, img, draw=True):
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(imgRGB)
-        is_successfull = True
+        is_successfull = False
         is_biting = False
         if self.results.multi_hand_landmarks:
             for handLms in self.results.multi_hand_landmarks:
                 if draw:
                     self.mpDraw.draw_landmarks(img, handLms, self.mpHands.HAND_CONNECTIONS)
             cv2.imshow('frame1', img)
-            if cv2.waitKey(4000) == ord('q'):
-                is_successfull = False
+            if cv2.waitKey(2000) == ord('q'):
+                # is_successfull = False
+                return is_successfull, None, imgRGB, is_biting
             elif cv2.waitKey(4000) == ord('w'):
+                is_successfull = True
                 is_biting = True
             else:
+                is_successfull = True
                 pass
             cv2.destroyWindow('frame1')
             time.sleep(1)
             lm_list = self.findPosition()
             return is_successfull, lm_list, img, is_biting
         else:
-            return not is_successfull, None, imgRGB, is_biting
+            return is_successfull, None, imgRGB, is_biting
 
     def findPosition(self, handNo=0, draw=True):
         lmList = []
@@ -97,7 +134,7 @@ def main():
     cap_face = cv2.VideoCapture(0)
 
     success_capture, img_face = cap_face.read()
-    success_face, face_lms = face_mesh.findFaceMesh(img_face) 
+    success_face, face_lms = face_mesh.findFaceMesh(img_face)
     if success_face == False:
         print("No Face Detected")
         return
