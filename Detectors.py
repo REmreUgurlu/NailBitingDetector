@@ -42,6 +42,7 @@ class FaceMeshDetector():
         else:
             return False, face
 
+
 class FaceDetector():
     def __init__(self, model_selection=1, min_detec_conf=0.5):
         self.model_selection = model_selection
@@ -68,8 +69,6 @@ class FaceDetector():
         # mouth_pos = self.mp_face_detection.get_key_point()
         
 
-        
-
 class HandDetector():
     def __init__(self, mode=False, maxHands=1, modComplex=1, detectionCon=0.2, trackCon=0.5):
         self.mode = mode
@@ -88,27 +87,15 @@ class HandDetector():
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(imgRGB)
         is_successfull = False
-        is_biting = False
         if self.results.multi_hand_landmarks:
+            is_successfull = True
             for handLms in self.results.multi_hand_landmarks:
                 if draw:
                     self.mpDraw.draw_landmarks(img, handLms, self.mpHands.HAND_CONNECTIONS)
-            cv2.imshow('frame1', img)
-            if cv2.waitKey(2000) == ord('q'):
-                # is_successfull = False
-                return is_successfull, None, imgRGB, is_biting
-            elif cv2.waitKey(4000) == ord('w'):
-                is_successfull = True
-                is_biting = True
-            else:
-                is_successfull = True
-                pass
-            cv2.destroyWindow('frame1')
-            time.sleep(1)
             lm_list = self.findPosition()
-            return is_successfull, lm_list, img, is_biting
+            return is_successfull, lm_list, img
         else:
-            return is_successfull, None, imgRGB, is_biting
+            return is_successfull, None, imgRGB
 
     def findPosition(self, handNo=0, draw=True):
         lmList = []
@@ -124,43 +111,90 @@ class HandDetector():
 
         return lmList
 
+def capture():
+    cap = cv2.VideoCapture(0)
+    return cap
 
-def main():
+def calculate_positions():
     face_mesh = FaceMeshDetector()
     hand_mesh = HandDetector()
     face_lms = []
     hand_lms = []
     lms = []
-    cap_face = cv2.VideoCapture(0)
-
+    cap_face = capture()
     success_capture, img_face = cap_face.read()
     success_face, face_lms = face_mesh.findFaceMesh(img_face)
     if success_face == False:
         print("No Face Detected")
-        return
+        return False
     else:
         lms = face_lms.copy()
-        success_hand, hand_lms, img, is_biting = hand_mesh.findHands(img_face, True)
+        success_hand, hand_lms, img = hand_mesh.findHands(img_face, True)
+
         if success_hand == True:
             face_lms.extend(hand_lms)
-            # is_biting 
-            # cv2.imshow("frame2", img)
-            # if cv2.waitKey(2000) == ord('e'):
-            #     is_biting = False
-            # cv2.destroyWindow('frame2')
-            # elif cv2.waitKey(2500) == ord('q'):
-            #     return
             for i in range(0,10,2):
                 pos_x = round(lms[0] - hand_lms[i],6)            
                 pos_y = round(lms[1] - hand_lms[i+1],6)
                 positions = [pos_x, pos_y]
                 lms.extend(positions)
-            lms.append(is_biting)
+        else:
+            return False
+    final_lms = lms[2:]
+    cv2.imshow("frame", img)
+    cv2.waitKey(1500)
+    cv2.destroyAllWindows()
+    return final_lms
+
+def main(repeat=10):
+    face_mesh = FaceMeshDetector()
+    hand_mesh = HandDetector()
+    face_lms = []
+    hand_lms = []
+    lms = []
+    cap_face = capture()
+    is_biting = False
+    success_capture, img_face = cap_face.read()
+    success_face, face_lms = face_mesh.findFaceMesh(img_face)
+    if success_face == False:
+        print("No Face Detected")
+    else:
+        lms = face_lms.copy()
+        success_hand, hand_lms, img = hand_mesh.findHands(img_face, True)
+
+        if success_hand == True:
+            face_lms.extend(hand_lms)
+            cv2.imshow('frame1', img)
+            if cv2.waitKey(2000) == ord('q'):
+                is_successfull = True
+                return
+            # elif cv2.waitKey(3000) == ord('w'):
+            #     is_successfull = True
+            #     is_biting = True
+            else:
+                is_successfull = True
+            
+            cv2.destroyWindow('frame1')
+            time.sleep(1)
+
+            for i in range(0,10,2):
+                pos_x = round(lms[0] - hand_lms[i],6)            
+                pos_y = round(lms[1] - hand_lms[i+1],6)
+                positions = [pos_x, pos_y]
+                lms.extend(positions)
+            lms.append(int(is_biting))
             final_lms = lms[2:]
-            return print(final_lms)
+            print(final_lms)
+            d_a = data_access.DataAccess()
+            print(d_a.write_to_csv(final_lms))
         else:
             print("No Hands detected")
-            return
+    if repeat != 0:
+        repeat-=1
+        print(repeat)
+        main(repeat)
+    return "Finished"
+    
 
 if __name__ == "__main__":
-    main()
+    main(5)
