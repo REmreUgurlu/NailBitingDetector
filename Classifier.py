@@ -1,10 +1,13 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 import tensorflow as tf
-import keras as keras
+import keras
 from keras import layers
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from DataAccess import DataAccess as d_a
+
 
  
 class Classify:
@@ -27,12 +30,12 @@ class Classify:
         return classifier
 
     def nn_classification(self, learningRate=0.01, epochs=30):      
-        normalizer = tf.keras.layers.Normalization(axis=-1)
+        normalizer = layers.Normalization(axis=-1)
         normalizer.adapt(np.array(self.train_features))
 
         classification_model = keras.models.Sequential([
-            normalizer,
-            layers.InputLayer(input_shape=(10)),
+            # normalizer,
+            layers.Input(shape=(10,)),
             layers.Dense(64, activation='relu'),
             layers.Dense(32, activation='relu'),
             layers.Dense(1, activation='sigmoid')

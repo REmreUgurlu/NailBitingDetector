@@ -5,7 +5,6 @@ import mediapipe as mp
 import numpy as np
 import time
 
-
 class FaceMeshDetector():
     
     def __init__(self,staticMode=False, maxFaces=1, refineLms=True, minDetectionCon = 0.5, minTrackCon=0.5):
@@ -112,10 +111,12 @@ class HandDetector():
         return lmList
 
 def capture():
+    print("Capturing...")
     cap = cv2.VideoCapture(0)
     return cap
 
 def calculate_positions():
+    print("Starting..")
     face_mesh = FaceMeshDetector()
     hand_mesh = HandDetector()
     face_lms = []
@@ -126,7 +127,7 @@ def calculate_positions():
     success_face, face_lms = face_mesh.findFaceMesh(img_face)
     if success_face == False:
         print("No Face Detected")
-        return False
+        return False, face_lms
     else:
         lms = face_lms.copy()
         success_hand, hand_lms, img = hand_mesh.findHands(img_face, True)
@@ -138,13 +139,15 @@ def calculate_positions():
                 pos_y = round(lms[1] - hand_lms[i+1],6)
                 positions = [pos_x, pos_y]
                 lms.extend(positions)
+            final_lms = lms[2:]
+            cv2.imshow("frame", img)
+            cv2.waitKey(5000)
+            cv2.destroyAllWindows()
+            print(f"final lms: {final_lms}")
+            return True, final_lms
         else:
-            return False
-    final_lms = lms[2:]
-    cv2.imshow("frame", img)
-    cv2.waitKey(1500)
-    cv2.destroyAllWindows()
-    return final_lms
+            return False, face_lms
+    
 
 def main(repeat=10):
     face_mesh = FaceMeshDetector()
@@ -197,4 +200,6 @@ def main(repeat=10):
     
 
 if __name__ == "__main__":
-    main(5)
+    # main(5)
+    # calculate_positions()
+    capture()

@@ -2,6 +2,7 @@ import Detectors as detectors
 import DataAccess as data_access
 import Classifier as classifier
 import numpy as np
+import os
 
 
 def rf_predicter(repeat):
@@ -13,7 +14,6 @@ def rf_predicter(repeat):
 
     for i in range(repeat):
         lms = detectors.calculate_positions()
-        print(lms)
         lms = np.array(lms)
         lms = np.reshape(lms, (1,-1))
         res = model.predict(lms)
@@ -31,15 +31,18 @@ def predicter(repeat):
     _classifier = classifier.Classify(X_train, X_test, y_train, y_test)
     model = _classifier.nn_classification()
     for i in range(repeat):
-        lms = detectors.calculate_positions()
-        prediction = model.predict(lms)
-        print(prediction)
-        threshold = 0.5
-        if prediction - threshold > 0:
-            print(f"You were biting your nail!")
+        succ, lms = detectors.calculate_positions()
+        if succ:
+            input_data = np.array([lms])
+            prediction = model.predict(input_data)
+            print(prediction)
+            threshold = 0.5
+            if prediction - threshold > 0:
+                print(f"You were biting your nail!")
+            else:
+                print(f"You were not biting your nail") 
         else:
-            print(f"You were not biting your nail") 
-
+            print("No faces detected!")        
 def trainer():
     d_a = data_access.DataAccess()
     train_features, train_labels, validation_features, validation_labels, test_features, test_labels = d_a.read_with_parameters()
@@ -52,7 +55,7 @@ def trainer():
 
 if __name__ == "__main__":
     # rf_predicter(5)
-    predicter(3)
+    predicter(1)
 
 
 

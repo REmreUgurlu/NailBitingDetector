@@ -65,7 +65,7 @@ class DataAccess:
     
 if __name__ == "__main__":
     d_a = DataAccess()
-    d_a.read_with_parameters()
+    print(d_a.read_with_parameters())
     # df = d_a.read_from_csv()
     # df.drop(index=[11,12,13], axis=0, inplace=True)
     # df.to_csv("data.csv", mode='w', index=)
