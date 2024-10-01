@@ -1,5 +1,5 @@
-import DataAccess as data_access
-import Classifier as classifier
+from DataAccess import DataAccess
+import Classifier
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -115,92 +115,57 @@ def capture():
     cap = cv2.VideoCapture(0)
     return cap
 
-def calculate_positions():
-    print("Starting..")
+def calculate_positions(face_lms, hand_lms):
+    lms = face_lms.copy()
+    for i in range(0, 10, 2):
+        pos_x = round(lms[0] - hand_lms[i], 6)
+        pos_y = round(lms[1] - hand_lms[i + 1], 6)
+        positions = [pos_x, pos_y]
+        lms.extend(positions)
+    final_lms = lms[2:]
+    return final_lms
+
+def main_loop():
     face_mesh = FaceMeshDetector()
     hand_mesh = HandDetector()
-    face_lms = []
-    hand_lms = []
-    lms = []
-    cap_face = capture()
-    success_capture, img_face = cap_face.read()
-    success_face, face_lms = face_mesh.findFaceMesh(img_face)
-    if success_face == False:
-        print("No Face Detected")
-        return False, face_lms
-    else:
-        lms = face_lms.copy()
-        success_hand, hand_lms, img = hand_mesh.findHands(img_face, True)
-
-        if success_hand == True:
-            face_lms.extend(hand_lms)
-            for i in range(0,10,2):
-                pos_x = round(lms[0] - hand_lms[i],6)            
-                pos_y = round(lms[1] - hand_lms[i+1],6)
-                positions = [pos_x, pos_y]
-                lms.extend(positions)
-            final_lms = lms[2:]
-            cv2.imshow("frame", img)
-            cv2.waitKey(5000)
-            cv2.destroyAllWindows()
-            print(f"final lms: {final_lms}")
-            return True, final_lms
-        else:
-            print("No Finger Detected")
-            return False, face_lms
-    
-
-def main(repeat=10):
-    face_mesh = FaceMeshDetector()
-    hand_mesh = HandDetector()
-    face_lms = []
-    hand_lms = []
-    lms = []
+    data_access = DataAccess(name="validation.csv")
     cap_face = capture()
     is_biting = False
-    success_capture, img_face = cap_face.read()
-    success_face, face_lms = face_mesh.findFaceMesh(img_face)
-    if success_face == False:
-        print("No Face Detected")
-    else:
-        lms = face_lms.copy()
+
+    while True:
+        success_capture, img_face = cap_face.read()
+        if not success_capture:
+            print("Failed to capture image")
+            continue
+        
+        success_face, face_lms = face_mesh.findFaceMesh(img_face)
         success_hand, hand_lms, img = hand_mesh.findHands(img_face, True)
 
-        if success_hand == True:
-            face_lms.extend(hand_lms)
-            cv2.imshow('frame1', img)
-            if cv2.waitKey(2000) == ord('q'):
-                is_successfull = True
-                return
-            # elif cv2.waitKey(3000) == ord('w'):
-            #     is_successfull = True
-            #     is_biting = True
-            else:
-                is_successfull = True
-            
-            cv2.destroyWindow('frame1')
-            time.sleep(1)
+        if success_face and success_hand:
+            final_lms = calculate_positions(face_lms, hand_lms)
 
-            for i in range(0,10,2):
-                pos_x = round(lms[0] - hand_lms[i],6)            
-                pos_y = round(lms[1] - hand_lms[i+1],6)
-                positions = [pos_x, pos_y]
-                lms.extend(positions)
-            lms.append(int(is_biting))
-            final_lms = lms[2:]
-            print(final_lms)
-            d_a = data_access.DataAccess()
-            print(d_a.write_to_csv(final_lms))
+            cv2.imshow("Calculated Positions", img)
+            print(f"Final LMS: {final_lms}")
+
+            key = cv2.waitKey(0)  # Wait for user input
+            if key == ord('q'):  # If 'q' is pressed
+                is_biting = True
+            elif key == ord(' '):  # If spacebar is pressed
+                is_biting = False
+            elif key == ord('t'):  # If 't' is pressed
+                print("Terminating process...")
+                break
+
+            final_lms.append(is_biting)
+            data_access.write_to_csv(final_lms)
+
         else:
-            print("No Hands detected")
-    if repeat != 0:
-        repeat-=1
-        print(repeat)
-        main(repeat)
-    return "Finished"
-    
+            print("Face or Hand Not Detected")
+        
+        time.sleep(3)
+
+    cap_face.release()
+    cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    # main(5)
-    # calculate_positions()
-    capture()
+    main_loop()
