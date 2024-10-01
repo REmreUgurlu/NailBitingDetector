@@ -4,7 +4,6 @@ import Classifier as classifier
 import numpy as np
 import os
 
-
 def rf_predicter(repeat):
     d_a = data_access.DataAccess()
     X_train, X_test, y_train, y_test= d_a.read_with_parameters()

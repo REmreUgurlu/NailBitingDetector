@@ -146,6 +146,7 @@ def calculate_positions():
             print(f"final lms: {final_lms}")
             return True, final_lms
         else:
+            print("No Finger Detected")
             return False, face_lms
     
 
